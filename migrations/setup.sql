@@ -107,3 +107,94 @@ CREATE TABLE balance_shops
     product_id INTEGER NOT NULL REFERENCES products (id) ON DELETE CASCADE,
     balance    DECIMAL NOT NULL
 );
+
+-- views
+
+CREATE OR REPLACE VIEW top_sales AS
+WITH sales_info AS (
+    SELECT
+        shop_id,
+        product_id,
+        sum(quantity) AS total_quantity
+    FROM sales
+    LEFT JOIN products p on sales.product_id = p.id
+    GROUP BY shop_id, product_id
+), tbl AS (
+    SELECT
+        s.shop_id,
+        s.product_id,
+        s.total_quantity * p.price AS revenue,
+        rank() OVER (PARTITION BY shop_id ORDER BY s.total_quantity*p.price DESC) AS r
+    FROM sales_info s
+    LEFT JOIN products p
+    ON s.product_id = p.id
+) SELECT
+      shop_id,
+      product_id,
+      revenue,
+      s.name AS shop_name,
+      p.name AS product_name
+  FROM tbl
+  LEFT JOIN shops s
+  ON tbl.shop_id = s.id
+  LEFT JOIN products p
+  ON tbl.product_id = p.id
+    WHERE r <= 5
+ORDER BY revenue DESC;
+
+
+CREATE OR REPLACE VIEW all_balances AS
+WITH shops_balances AS (
+    SELECT shop_id,
+           s.name AS name,
+           s.location AS location,
+           balance
+    FROM (SELECT *, rank() OVER (PARTITION BY shop_id, product_id ORDER BY date DESC) AS r
+          FROM balance_shops
+          WHERE date <= now()::DATE) AS tbl_balance_shops
+    LEFT JOIN shops s ON tbl_balance_shops.shop_id = s.id
+    WHERE date=now()::DATE
+), storages_balances AS (
+    SELECT storage_id,
+           s.name AS name,
+           s.location AS location,
+           balance
+    FROM (SELECT *, rank() OVER (PARTITION BY storage_id, product_id ORDER BY date DESC) AS r
+          FROM balance_storages
+          WHERE date <= now()::DATE) AS tbl_balance_storages
+    LEFT JOIN storages s ON tbl_balance_storages.storage_id = s.id
+    WHERE date=now()::DATE
+), dc_balances AS (
+    SELECT dc_id,
+           dc.name AS name,
+           dc.location AS location,
+           balance
+    FROM (SELECT *, rank() OVER (PARTITION BY dc_id, product_id ORDER BY date DESC) AS r
+          FROM balance_dc
+          WHERE date <= now()::DATE) AS tbl_balance_dc
+    LEFT JOIN distribution_centers dc on tbl_balance_dc.dc_id = dc.id
+    WHERE date=now()::DATE
+)
+SELECT shop_id AS place_id,
+       location,
+       'shop' AS type,
+       name,
+       sum(balance) AS balance
+FROM shops_balances
+GROUP BY shop_id, location, name
+UNION ALL
+SELECT storage_id AS place_id,
+       location,
+       'storage' AS type,
+       name,
+       sum(balance) AS balance
+FROM storages_balances
+GROUP BY storage_id, location, name
+UNION ALL
+SELECT dc_id AS place_id,
+       location,
+       'dc' AS type,
+       name,
+       sum(balance) AS balance
+FROM dc_balances
+GROUP BY dc_id, location, name;

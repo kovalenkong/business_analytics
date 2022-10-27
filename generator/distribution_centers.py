@@ -5,7 +5,7 @@ import pandas as pd
 
 
 def generate_distribution_center_name(center_number: int) -> str:
-    return f'РЦ №{center_number}'
+    return f'DC №{center_number}'
 
 
 def generate_distribution_centers(n: int, geo_dc: List[List[float]] = None) -> pd.DataFrame:
