@@ -105,7 +105,9 @@ CREATE TABLE balance_shops
     date       DATE    NOT NULL,
     shop_id    INTEGER NOT NULL REFERENCES shops (id) ON DELETE CASCADE,
     product_id INTEGER NOT NULL REFERENCES products (id) ON DELETE CASCADE,
-    balance    DECIMAL NOT NULL
+    balance    DECIMAL NOT NULL,
+
+    UNIQUE (date, shop_id, product_id)
 );
 
 -- views
@@ -153,7 +155,7 @@ WITH shops_balances AS (
           FROM balance_shops
           WHERE date <= now()::DATE) AS tbl_balance_shops
     LEFT JOIN shops s ON tbl_balance_shops.shop_id = s.id
-    WHERE date=now()::DATE
+    WHERE r=1
 ), storages_balances AS (
     SELECT storage_id,
            s.name AS name,
@@ -163,7 +165,7 @@ WITH shops_balances AS (
           FROM balance_storages
           WHERE date <= now()::DATE) AS tbl_balance_storages
     LEFT JOIN storages s ON tbl_balance_storages.storage_id = s.id
-    WHERE date=now()::DATE
+    WHERE r=1
 ), dc_balances AS (
     SELECT dc_id,
            dc.name AS name,
@@ -173,7 +175,7 @@ WITH shops_balances AS (
           FROM balance_dc
           WHERE date <= now()::DATE) AS tbl_balance_dc
     LEFT JOIN distribution_centers dc on tbl_balance_dc.dc_id = dc.id
-    WHERE date=now()::DATE
+    WHERE r=1
 )
 SELECT shop_id AS place_id,
        location,
